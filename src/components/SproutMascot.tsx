@@ -1,7 +1,41 @@
 import React from 'react';
 import { motion } from 'motion/react';
 
-export const SproutMascot: React.FC<{ message?: string; className?: string }> = ({ message, className }) => {
+export const SproutMascot: React.FC<{ message?: React.ReactNode; className?: string; variant?: 'default' | 'alert' }> = ({ message, className, variant = 'default' }) => {
+  if (variant === 'alert') {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className={`bg-slate-800/80 backdrop-blur-xl border border-sprout-green/30 p-4 rounded-[32px] flex items-center gap-4 shadow-2xl shadow-sprout-green/10 ${className}`}
+      >
+        <motion.div
+          animate={{
+            scale: [1, 1.1, 1],
+            rotate: [0, 10, -10, 0],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="w-14 h-14 bg-sprout-green rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-lg shadow-sprout-green/20"
+        >
+          🌱
+        </motion.div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-black text-sprout-green uppercase tracking-[0.2em]">Sprout spotted something!</span>
+            <div className="h-1 w-1 bg-sprout-green rounded-full animate-pulse" />
+          </div>
+          <p className="text-sm text-slate-200 font-medium leading-tight">
+            {message}
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <div className={`flex flex-col items-center gap-2 ${className}`}>
       <motion.div

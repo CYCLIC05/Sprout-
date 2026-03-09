@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, WatchlistItem } from './types';
+import { Asset, WatchlistItem, MarketStats, Sale } from './types';
 import { SproutMascot } from './components/SproutMascot';
 import { AssetCard } from './components/AssetCard';
 import { UsernameTracker } from './components/UsernameTracker';
@@ -16,7 +16,12 @@ import {
   ArrowUpRight,
   Zap,
   BrainCircuit,
-  Newspaper
+  Newspaper,
+  Activity,
+  Users,
+  BarChart3,
+  Globe,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -26,7 +31,9 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  LineChart,
+  Line
 } from 'recharts';
 import { GoogleGenAI } from "@google/genai";
 
@@ -69,6 +76,8 @@ export default function App() {
   const [category, setCategory] = useState<'all' | 'usernames' | 'nfts' | 'gifts' | 'stickers'>('all');
   const [assets, setAssets] = useState<Asset[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [marketStats, setMarketStats] = useState<MarketStats | null>(null);
+  const [recentSales, setRecentSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [timeframe, setTimeframe] = useState<Timeframe>('7D');
@@ -83,14 +92,21 @@ export default function App() {
 
   const fetchData = async () => {
     try {
-      const [assetsRes, watchlistRes] = await Promise.all([
+      const [assetsRes, watchlistRes, statsRes, salesRes] = await Promise.all([
         fetch('/api/assets'),
-        fetch('/api/watchlist')
+        fetch('/api/watchlist'),
+        fetch('/api/market-stats'),
+        fetch('/api/recent-sales')
       ]);
       const assetsData = await assetsRes.json();
       const watchlistData = await watchlistRes.json();
+      const statsData = await statsRes.json();
+      const salesData = await salesRes.json();
+      
       setAssets(assetsData);
       setWatchlist(watchlistData);
+      setMarketStats(statsData);
+      setRecentSales(salesData);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -159,6 +175,51 @@ export default function App() {
       case 'dashboard':
         return (
           <div className="space-y-6">
+            {/* Market Stats Header */}
+            {marketStats && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-800/40 p-3 rounded-2xl border border-slate-700/30">
+                  <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold uppercase mb-1">
+                    <Globe size={10} /> Market Cap
+                  </div>
+                  <div className="text-sm font-bold text-slate-100">{marketStats.marketCap}</div>
+                </div>
+                <div className="bg-slate-800/40 p-3 rounded-2xl border border-slate-700/30">
+                  <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold uppercase mb-1">
+                    <Activity size={10} /> 24h Volume
+                  </div>
+                  <div className="text-sm font-bold text-slate-100">{marketStats.volume24h}</div>
+                </div>
+                <div className="bg-slate-800/40 p-3 rounded-2xl border border-slate-700/30">
+                  <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold uppercase mb-1">
+                    <BarChart3 size={10} /> Total Sales
+                  </div>
+                  <div className="text-sm font-bold text-slate-100">{marketStats.totalSales.toLocaleString()}</div>
+                </div>
+                <div className="bg-slate-800/40 p-3 rounded-2xl border border-slate-700/30">
+                  <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold uppercase mb-1">
+                    <Users size={10} /> Active Traders
+                  </div>
+                  <div className="text-sm font-bold text-slate-100">{marketStats.activeTraders.toLocaleString()}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Sprout Alert */}
+            {assets.length > 0 && (
+              <SproutMascot 
+                variant="alert"
+                message={(() => {
+                  const trending = [...assets].sort((a, b) => b.change_24h - a.change_24h)[0];
+                  return (
+                    <>
+                      <span className="text-sprout-green font-bold">{trending.name}</span> is trending with <span className="text-emerald-500 font-bold">+{trending.change_24h}%</span> growth today. Scarcity is increasing!
+                    </>
+                  );
+                })()}
+              />
+            )}
+
             <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
               {(['all', 'usernames', 'nfts', 'gifts', 'stickers'] as const).map((cat) => (
                 <button
@@ -205,23 +266,62 @@ export default function App() {
                             {asset.name[0].toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-bold text-slate-100">{asset.name}</div>
+                            <div className="font-bold text-slate-100 text-sm">{asset.name}</div>
                             <div className="text-[10px] font-bold text-slate-500 uppercase">{asset.type}</div>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-8">
+                      <div className="flex items-center gap-4">
+                        {/* Mini Sparkline */}
+                        <div className="w-16 h-8 hidden sm:block">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={generateChartData('7D', asset.price)}>
+                              <Line 
+                                type="monotone" 
+                                dataKey="price" 
+                                stroke={asset.change_24h >= 0 ? '#10b981' : '#f43f5e'} 
+                                strokeWidth={2} 
+                                dot={false} 
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+
                         <div className="text-right">
-                          <div className="font-bold text-slate-100">{asset.price.toLocaleString()} TON</div>
+                          <div className="font-bold text-slate-100 text-sm">{asset.price.toLocaleString()} TON</div>
                           <div className={`text-[10px] font-bold ${asset.change_24h >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {asset.change_24h > 0 ? '+' : ''}{asset.change_24h}%
                           </div>
                         </div>
-                        <div className="w-16 flex justify-end">
-                          <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold rounded-lg border border-emerald-500/20">
-                            10/10
-                          </span>
+                        <div className="w-14 flex justify-end">
+                          <div className="group/trust relative">
+                            <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold rounded-lg border border-emerald-500/20">
+                              10/10
+                            </span>
+                            {/* Trust Score Tooltip */}
+                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-2xl opacity-0 invisible group-hover/trust:opacity-100 group-hover/trust:visible transition-all z-30 pointer-events-none">
+                              <h5 className="text-[10px] font-black text-slate-100 uppercase mb-2">Trust Breakdown</h5>
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between text-[9px] font-bold">
+                                  <span className="text-slate-500">Liquidity</span>
+                                  <span className="text-emerald-500">High</span>
+                                </div>
+                                <div className="flex justify-between text-[9px] font-bold">
+                                  <span className="text-slate-500">Frequency</span>
+                                  <span className="text-emerald-500">Active</span>
+                                </div>
+                                <div className="flex justify-between text-[9px] font-bold">
+                                  <span className="text-slate-500">History</span>
+                                  <span className="text-emerald-500">Clean</span>
+                                </div>
+                                <div className="flex justify-between text-[9px] font-bold">
+                                  <span className="text-slate-500">Age</span>
+                                  <span className="text-emerald-500">Established</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -241,6 +341,32 @@ export default function App() {
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Recent Activity Feed */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+                <Activity size={16} className="text-sprout-green" /> Recent Activity
+              </h3>
+              <div className="bg-slate-800/30 rounded-3xl overflow-hidden border border-slate-700/30">
+                {recentSales.map((sale, i) => (
+                  <div 
+                    key={sale.id} 
+                    className={`p-4 flex items-center justify-between ${i !== recentSales.length - 1 ? 'border-b border-slate-700/30' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                      <div>
+                        <div className="text-xs font-bold text-slate-100">
+                          <span className="text-sprout-green">{sale.assetName}</span> sold for <span className="text-slate-100">{sale.price.toLocaleString()} TON</span>
+                        </div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase">{sale.time}</div>
+                      </div>
+                    </div>
+                    <ArrowUpRight size={14} className="text-slate-600" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>

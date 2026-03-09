@@ -50,6 +50,25 @@ async function startServer() {
     res.json(getMockAssets());
   });
 
+  app.get("/api/market-stats", (req, res) => {
+    res.json({
+      marketCap: "1.2B TON",
+      volume24h: "42,300 TON",
+      totalSales: 1204,
+      activeTraders: 856
+    });
+  });
+
+  app.get("/api/recent-sales", (req, res) => {
+    res.json([
+      { id: 's1', assetName: 'crypto.ton', price: 8900, time: '2m ago' },
+      { id: 's2', assetName: 'TON Punk #442', price: 450, time: '5m ago' },
+      { id: 's3', assetName: 'Golden Gift', price: 120, time: '12m ago' },
+      { id: 's4', assetName: 'sprout.ton', price: 1250, time: '15m ago' },
+      { id: 's5', assetName: 'Diamond Heart', price: 45, time: '22m ago' },
+    ]);
+  });
+
   app.get("/api/watchlist", (req, res) => {
     const items = db.prepare("SELECT * FROM watchlist").all();
     res.json(items);
