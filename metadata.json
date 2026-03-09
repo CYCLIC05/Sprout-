@@ -1,0 +1,5 @@
+{
+  "name": "Sprout - TON Analytics",
+  "description": "A Telegram-native mini-app for tracking TON usernames, NFTs, gifts, and sticker packs with real-time analytics and AI insights.",
+  "requestFramePermissions": []
+}
